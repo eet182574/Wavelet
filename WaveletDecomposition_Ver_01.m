@@ -1,0 +1,76 @@
+clc, clear all, close('all');
+ImageName = input('Enter file name: ','s');
+OriginalImage = imread(ImageName);
+[rows,cols,dims] = size(OriginalImage);
+if dims == 3
+    OriginalImage = rgb2gray(OriginalImage);
+end
+figure,imshow(OriginalImage),title('Original Image as input');
+OriginalImage = double(OriginalImage);
+%h_s = [1/sqrt(2) 1/sqrt(2)];
+%h_w = [1/sqrt(2) -1/sqrt(2)];
+% Daubechies4PointCoefficentsLPF = [0.4829629131445341, 0.8365163037378079, 0.2241438680420134, -0.1294095225512604];
+% -0.1294   -0.2241    0.8365   -0.4830
+h_s = [0.4829629131445341, 0.8365163037378079, 0.2241438680420134, -0.1294095225512604];
+h_w = [-0.1294   -0.2241    0.8365   -0.4830];
+%% Perform row wise scaling and wavelet transform
+ScalingResultRow = zeros(rows,cols+length(h_s)-1);
+WaveletResultRow = zeros(rows,cols+length(h_s)-1);
+for i = 1:rows
+    ScalingResultRow(i,:) = conv(OriginalImage(i,:),h_s(end:-1:1));
+    WaveletResultRow(i,:) = conv(OriginalImage(i,:),h_w(end:-1:1));
+end
+figure,imshow(ScalingResultRow,[]),title('RowWise Scaling image');
+figure,imshow(WaveletResultRow,[]),title('RowWise Wavelet image');
+%% Perform subsampling along rows
+offset = length(h_s) - 1;  % Offset is for h(n) where origin of h(n) is at n=0. As h(n) becomes h(-n), origin of h(-n) becomes 1. And further h(-n) is flipped in conv operation, so origin goes back to 0.
+ScalingResultRowsubsampled = zeros(rows,length(1+offset:2:size(ScalingResultRow,2)));
+WaveletResultRowsubsampled = ScalingResultRowsubsampled;
+for i = 1:rows
+    ScalingResultRowsubsampled(i,:) = ScalingResultRow(i,1+offset:2:size(ScalingResultRow,2)); 
+    WaveletResultRowsubsampled(i,:) = WaveletResultRow(i,1+offset:2:size(ScalingResultRow,2)); 
+end
+
+figure,imshow(ScalingResultRowsubsampled,[]),title('RowWise Scaling and subsampled image');
+figure,imshow(WaveletResultRowsubsampled,[]),title('RowWise Wavelet and subsampled image');
+
+%% Perform col wise scaling and wavelet transform
+ScalingScalingResultCol = zeros(size(ScalingResultRowsubsampled,1) + length(h_s)-1,size(ScalingResultRowsubsampled,2));
+ScalingWaveletResultCol = ScalingScalingResultCol;
+WaveletScalingResultCol = ScalingScalingResultCol;
+WaveletWaveletResultCol = ScalingScalingResultCol;
+for i = 1:size(ScalingResultRowsubsampled,2)
+    ScalingScalingResultCol(:,i) = conv(ScalingResultRowsubsampled(:,i),h_s(end:-1:1));
+    ScalingWaveletResultCol(:,i) = conv(ScalingResultRowsubsampled(:,i),h_w(end:-1:1));
+    WaveletScalingResultCol(:,i) = conv(WaveletResultRowsubsampled(:,i),h_s(end:-1:1));
+    WaveletWaveletResultCol(:,i) = conv(WaveletResultRowsubsampled(:,i),h_w(end:-1:1));
+end
+figure,imshow(ScalingScalingResultCol,[]),title('ColWise ScalingScaling image');
+figure,imshow(ScalingWaveletResultCol,[]),title('ColWise ScalingWavelet image');
+figure,imshow(WaveletScalingResultCol,[]),title('ColWise WaveletScaling image');
+figure,imshow(WaveletWaveletResultCol,[]),title('ColWise WaveletWavelet image');
+%% Perform subsampling along cols
+offset = length(h_s) - 1;  % Offset is for h(n) where origin of h(n) is at n=0. As h(n) becomes h(-n), origin of h(-n) becomes 1. And further h(-n) is flipped in conv operation, so origin goes back to 0.
+ScalingScalingResultColsubsampled = zeros(length(1+offset:2:size(ScalingScalingResultCol,1)),size(ScalingScalingResultCol,2));
+ScalingWaveletResultColsubsampled = ScalingScalingResultColsubsampled;
+WaveletScalingResultColsubsampled = ScalingScalingResultColsubsampled;
+WaveletWaveletResultColsubsampled = ScalingScalingResultColsubsampled;
+
+for i = 1:size(ScalingScalingResultCol,2)
+    ScalingScalingResultColsubsampled(:,i) = ScalingScalingResultCol(1+offset:2:size(ScalingScalingResultCol,1),i); 
+    ScalingWaveletResultColsubsampled(:,i) = ScalingWaveletResultCol(1+offset:2:size(ScalingWaveletResultCol,1),i); 
+    WaveletScalingResultColsubsampled(:,i) = WaveletScalingResultCol(1+offset:2:size(WaveletScalingResultCol,1),i); 
+    WaveletWaveletResultColsubsampled(:,i) = WaveletWaveletResultCol(1+offset:2:size(WaveletWaveletResultCol,1),i); 
+end
+figure,imshow(ScalingScalingResultColsubsampled,[]),title('ColWise Scaling Scaling and subsampled image');
+figure,imshow(ScalingWaveletResultColsubsampled,[]),title('ColWise Scaling Wavelet and subsampled image');
+figure,imshow(WaveletScalingResultColsubsampled,[]),title('ColWise Wavelet Scaling and subsampled image');
+figure,imshow(WaveletWaveletResultColsubsampled,[]),title('ColWise Wavelet Wavelet and subsampled image');
+
+%% pack the results in one image
+Result = zeros(rows,cols);
+Result(1:(size(ScalingScalingResultColsubsampled,1)),1:(size(ScalingScalingResultColsubsampled,2))) = ScalingScalingResultColsubsampled;
+Result(1:(size(ScalingScalingResultColsubsampled,1)),size(WaveletWaveletResultColsubsampled,2)+1:2*size(WaveletWaveletResultColsubsampled,2)) = ScalingWaveletResultColsubsampled;
+Result(size(WaveletWaveletResultColsubsampled,1)+1:2*size(WaveletWaveletResultColsubsampled,1),1:(size(ScalingScalingResultColsubsampled,2))) = WaveletScalingResultColsubsampled;
+Result(size(WaveletWaveletResultColsubsampled,1)+1:2*size(WaveletWaveletResultColsubsampled,1),size(WaveletWaveletResultColsubsampled,2)+1:2*size(WaveletWaveletResultColsubsampled,2)) = WaveletWaveletResultColsubsampled;
+figure,imshow(Result,[]),title('Scale -1 decomposition');
